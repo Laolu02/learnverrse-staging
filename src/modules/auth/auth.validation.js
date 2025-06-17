@@ -23,9 +23,9 @@ export const RegisterUserSchema = z.object({
     })
     .min(8, 'Password must be at least 8 characters long'),
 
-  role: z.enum(['learner', 'educator'], {
-    required_error: 'Role is required, "learner" or "educator"',
-    invalid_type_error: 'Role must be either "learner" or "educator"',
+  role: z.enum(['LEARNER', 'EDUCATOR'], {
+    required_error: 'Role is required, "LEARNER" or "EDUCATOR"',
+    invalid_type_error: 'Role must be either "LEARNER" or "EDUCATOR"',
   }),
 });
 

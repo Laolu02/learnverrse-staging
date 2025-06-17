@@ -1,5 +1,5 @@
 export const UserRoleEnum = {
-  LEARNER: 'learner',
-  EDUCATOR: 'educator',
-  ADMIN: 'admin',
+  LEARNER: 'LEARNER',
+  EDUCATOR: 'EDUCATOR',
+  ADMIN: 'ADMIN',
 };
