@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const enrolmentSchema = new mongoose.Schema(
+const enrollmentSchema = new mongoose.Schema(
   {
     courseId: {
       type: mongoose.Types.ObjectId,
@@ -12,9 +12,12 @@ const enrolmentSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    enrolledAt: Date,
+    paymentStatus: String,
+    accessGranted: Boolean,
   },
   { timestamps: true }
 );
 
-const EnrolmentModel = mongoose.model('Enrolment', enrolmentSchema);
-export default EnrolmentModel;
+const EnrollmentModel = mongoose.model('Enrolment', enrollmentSchema);
+export default EnrollmentModel;

@@ -32,7 +32,7 @@ export const getAllCoursesService = async (req) => {
 
     // Only courses by the logged-in educator
     if (ownCoursesOnly === 'true') {
-      filters.educatorId = req.user._id;
+      filters.educatorId = req.user?._id;
     }
 
     // Filter featured courses

@@ -1,5 +1,20 @@
 import { z } from 'zod';
 
+const passwordSchema = z
+  .string({
+    required_error: 'Password is required',
+    invalid_type_error: 'Password must be a string',
+  })
+  .min(8, 'Password must be at least 8 characters long')
+  .max(64, 'Password must be at most 64 characters long')
+  .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+  .regex(/[0-9]/, 'Password must contain at least one digit')
+  .regex(
+    /[^A-Za-z0-9]/,
+    'Password must contain at least one special character'
+  );
+
 export const RegisterUserSchema = z.object({
   name: z
     .string({
@@ -16,12 +31,7 @@ export const RegisterUserSchema = z.object({
     })
     .email('Please provide a valid email address'),
 
-  password: z
-    .string({
-      required_error: 'Password is required',
-      invalid_type_error: 'Password must be a string',
-    })
-    .min(8, 'Password must be at least 8 characters long'),
+  password: passwordSchema,
 
   role: z.enum(['LEARNER', 'EDUCATOR'], {
     required_error: 'Role is required, "LEARNER" or "EDUCATOR"',
@@ -48,10 +58,7 @@ export const LoginUserSchema = z.object({
       invalid_type_error: 'Email must be a string',
     })
     .email('Please provide a valid email address'),
-  password: z.string({
-    required_error: 'Password is required',
-    invalid_type_error: 'Password must be a string',
-  }),
+  password: passwordSchema,
 });
 
 export const UserEmailSchema = z.object({
@@ -88,17 +95,5 @@ export const setNewPasswordSchema = z.object({
     required_error: 'Email is required',
     invalid_type_error: 'Email must be a string',
   }),
-  password: z
-    .string({
-      required_error: 'Password is required',
-      invalid_type_error: 'Password must be a string',
-    })
-    .min(8, 'Password must be at least 8 characters long'), // corrected from 6 to 8
-  //   .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-  //   .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-  //   .regex(/[0-9]/, 'Password must contain at least one number')
-  //   .regex(
-  //     /[^A-Za-z0-9]/,
-  //     'Password must contain at least one special character'
-  //   )
+  password: passwordSchema,
 });

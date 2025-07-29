@@ -12,26 +12,77 @@ import logger from './utils/logger.js';
 
 const app = express();
 
-//USE PASSPORT
+// Trust proxy if behind a load balancer (Render sets this)
+app.set('trust proxy', 1);
+
+// Initialize Passport
 app.use(passport.initialize());
 
-// MIDDLEWARES
-app.use(helmet());
-app.use(cors({ origin: true, credentials: true }));
+// Middleware: HTTPS Redirect (Production only)
+app.use((req, res, next) => {
+  if (
+    process.env.NODE_ENV === 'production' &&
+    req.headers['x-forwarded-proto'] !== 'https'
+  ) {
+    return res.redirect(`https://${req.headers.host}${req.url}`);
+  }
+  next();
+});
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        defaultSrc: ["'none'"], //  Block all content loading
+        scriptSrc: ["'none'"], // Block any script loading
+        styleSrc: ["'none'"], // No CSS needed on an API server
+        imgSrc: ["'none'"], //  No image content allowed
+        connectSrc: ["'self'"], //  Only allow outbound connections to self
+        frameAncestors: ["'none'"], //  Disallow embedding
+      },
+    },
+    crossOriginEmbedderPolicy: false, // Safe to disable — avoids blocking frontend fetches
+  })
+);
+
+// CORS: Restrict to production frontend domain
+const allowedOrigins = [
+  'https://learnverrse.github.io/learnverrse/',
+  'http://localhost:5173',
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  })
+);
+
+// Body Parsing & Cookies
 app.use(express.json());
 app.use(cookieParser());
 
+// Logging
 app.use((req, res, next) => {
   logger.info(`Received ${req.method} request to ${req.url}`);
   next();
 });
 
-//DDOS PROTECTION RATE LIMITING
+// Rate Limiting Middleware (Redis)
 const rateLimiter = new RateLimiterRedis({
   storeClient: redis,
   keyPrefix: 'middleware',
-  points: 10,
-  duration: 1,
+  points: 10, // Allow 10 requests
+  duration: 1, // Per second
 });
 
 app.use((req, res, next) => {
@@ -44,10 +95,19 @@ app.use((req, res, next) => {
     });
 });
 
-// API ROUTES
+// API Routes
 app.use('/api', routes);
 
-// GLOBAL ERROR HANDLER
+// 404 Fallback
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message:
+      "Lost? 🚀 That page doesn't exist — but welcome to Learnverrse! Let's explore knowledge together.",
+  });
+});
+
+// Global Error Handler
 app.use(errorHandler);
 
 export default app;
