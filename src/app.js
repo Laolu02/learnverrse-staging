@@ -12,13 +12,13 @@ import logger from './utils/logger.js';
 
 const app = express();
 
-// Trust proxy if behind a load balancer (Render sets this)
+// Trust proxy if behind a load balancer
 app.set('trust proxy', 1);
 
-// Initialize Passport
+// Passport
 app.use(passport.initialize());
 
-// Middleware: HTTPS Redirect (Production only)
+// HTTPS Redirect in production
 app.use((req, res, next) => {
   if (
     process.env.NODE_ENV === 'production' &&
@@ -29,45 +29,50 @@ app.use((req, res, next) => {
   next();
 });
 
+// Helmet Security
 app.use(
   helmet({
     contentSecurityPolicy: {
       useDefaults: true,
       directives: {
-        defaultSrc: ["'none'"], //  Block all content loading
-        scriptSrc: ["'none'"], // Block any script loading
-        styleSrc: ["'none'"], // No CSS needed on an API server
-        imgSrc: ["'none'"], //  No image content allowed
-        connectSrc: ["'self'"], //  Only allow outbound connections to self
-        frameAncestors: ["'none'"], //  Disallow embedding
+        defaultSrc: ["'none'"],
+        scriptSrc: ["'none'"],
+        styleSrc: ["'none'"],
+        imgSrc: ["'none'"],
+        connectSrc: ["'self'"],
+        frameAncestors: ["'none'"],
       },
     },
-    crossOriginEmbedderPolicy: false, // Safe to disable — avoids blocking frontend fetches
+    crossOriginEmbedderPolicy: false,
   })
 );
 
-// CORS: Restrict to production frontend domain
+// CORS Config
 const allowedOrigins = [
-  'https://learnverrse.github.io/learnverrse/',
+  'https://learnverrse.github.io',
   'http://localhost:5173',
 ];
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  })
-);
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+};
 
-// Body Parsing & Cookies
+// Apply CORS
+app.use(cors(corsOptions));
+
+// This works and avoids path-to-regexp errors
+app.use('/api', cors(corsOptions), routes);
+
+// Body & cookies
 app.use(express.json());
 app.use(cookieParser());
 
@@ -77,12 +82,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rate Limiting Middleware (Redis)
+// Rate Limiting
 const rateLimiter = new RateLimiterRedis({
   storeClient: redis,
   keyPrefix: 'middleware',
-  points: 10, // Allow 10 requests
-  duration: 1, // Per second
+  points: 10,
+  duration: 1,
 });
 
 app.use((req, res, next) => {
@@ -95,10 +100,10 @@ app.use((req, res, next) => {
     });
 });
 
-// API Routes
+// Routes
 app.use('/api', routes);
 
-// 404 Fallback
+// 404
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -107,7 +112,7 @@ app.use((req, res) => {
   });
 });
 
-// Global Error Handler
+// Error handler
 app.use(errorHandler);
 
 export default app;
