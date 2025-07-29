@@ -66,15 +66,15 @@ const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 };
 
-// Apply CORS
-app.use(cors(corsOptions));
-
 // This works and avoids path-to-regexp errors
-app.use('/api', cors(corsOptions), routes);
+// app.use('/api', cors(corsOptions), routes);
 
 // Body & cookies
 app.use(express.json());
 app.use(cookieParser());
+
+// Apply CORS
+app.use(cors(corsOptions));
 
 // Logging
 app.use((req, res, next) => {
