@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   getCourseAnalytics,
+  getCourseContent,
   getCourseProgress,
   getUserAllCoursesProgress,
   markChapterCompleted,
@@ -10,12 +11,10 @@ import {
 
 const router = express.Router();
 
-// Mark chapter as completed
-// Most specific paths FIRST
 router.get('/analytics/:courseId', getCourseAnalytics);
 router.get('/user/:userId', getUserAllCoursesProgress);
+router.get('/access/:userId/:courseId', getCourseContent);
 
-// Then the ones with dynamic segments
 router.get('/:userId/:courseId', getCourseProgress);
 router.patch('/:userId/:courseId/position', updateCurrentPosition);
 router.patch(

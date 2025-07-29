@@ -23,17 +23,17 @@ export const courseEnrollmentController = AsyncHandler(async (req, res) => {
   }
 
   // If course is paid, check for user's payment
-  if (course.subscription === CourseSubscriptionEnum.PAID) {
-    const payment = await PaymentModel.findOne({
-      userId,
-      courseId,
-      status: 'success',
-    });
+  // if (course.subscription === CourseSubscriptionEnum.PAID) {
+  //   const payment = await PaymentModel.findOne({
+  //     userId,
+  //     courseId,
+  //     status: 'success',
+  //   });
 
-    if (!payment) {
-      throw new UnauthorizedException('No valid payment found for this course');
-    }
-  }
+  //   if (!payment) {
+  //     throw new UnauthorizedException('No valid payment found for this course');
+  //   }
+  // }
 
   //  Proceed with enrollment
   await enrollInCourse({ userId, courseId });

@@ -86,7 +86,6 @@ export const verifyRegisterController = AsyncHandler(async (req, res, next) => {
 
 // login user (Learner or Educator)
 export const loginUserController = AsyncHandler(async (req, res, next) => {
-  console.log(req.body);
   const body = LoginUserSchema.parse({ ...req.body });
 
   const { email, password } = body;
