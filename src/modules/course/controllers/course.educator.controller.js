@@ -5,7 +5,7 @@ import { getAllCoursesService } from '../services/getAllCourses.course.service.j
 import { createCourseService } from '../services/create.course.service.js';
 import { updateCourseService } from '../services/update.course.service.js';
 import { deleteCourseService } from '../services/delete.course.service.js';
-import { getUploadVideoUrlService } from '../services/get-video-upload-url.course.service.js';
+import { getUploadUrlService } from '../services/get-video-upload-url.course.service.js';
 
 /**
  * @desc    View all courses on platform with filtering options
@@ -90,20 +90,22 @@ export const deleteCourse = AsyncHandler(async (req, res) => {
  * @desc    get video upload url
  * @route   POST /:courseId/sections/:sectionId/chapters/:chapterId/get-upload-url
  */
-export const getUploadVideoUrl = AsyncHandler(async (req, res) => {
-  const { fileName, fileType } = req.body;
+export const getUploadUrl = AsyncHandler(async (req, res) => {
+  const { fileName, fileType, fileSize } = req.body;
+
+  console.log(req.body);
 
   if (!fileName || !fileType) {
     throw new BadRequestException('File name and type are required');
   }
-  const { uploadUrl, videoUrl } = await getUploadVideoUrlService(
+  const { uploadUrl, videoUrl, metadata } = await getUploadUrlService(
     fileName,
-    fileType
+    fileType,
+    fileSize
   );
 
   return res.status(HTTPSTATUS.CREATED).json({
     success: true,
-    message: 'Upload URL generated successfully',
-    data: { uploadUrl, videoUrl },
+    data: { uploadUrl, videoUrl, metadata },
   });
 });

@@ -2,7 +2,7 @@ import express from 'express';
 import {
   createCourse,
   deleteCourse,
-  getUploadVideoUrl,
+  getUploadUrl,
   updateCourse,
   viewAllCourses,
 } from '../controllers/course.educator.controller.js';
@@ -18,7 +18,8 @@ router.delete('/:courseId', deleteCourse);
 
 router.post(
   '/:courseId/sections/:sectionId/chapters/:chapterId/get-upload-url',
-  getUploadVideoUrl
+  getUploadUrl
 );
+router.post('/:courseId/uploads', getUploadUrl);
 
 export default router;
