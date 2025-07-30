@@ -2,17 +2,19 @@ import mongoose, { Schema } from 'mongoose';
 import { CourseLevelEnum } from '../../../enums/course-level.enum.js';
 import { CourseStatusEnums } from '../../../enums/course-status.enum.js';
 import { CourseSubscriptionEnum } from '../../../enums/course-subscription.enum.js';
+import { ChapterTypeEnum } from '../../../enums/chapter-type.enum.js';
 
 // Chapter Schema
 const chapterSchema = new Schema({
   chapterId: { type: String, required: true },
   type: {
     type: String,
-    enum: ['Text', 'Video'],
+    enum: Object.values(ChapterTypeEnum),
+    required: true,
   },
   title: { type: String },
   content: { type: String },
-  video: { type: String },
+  video: { type: String }, 
   duration: { type: Number }, // duration in minutes for videos
 });
 
