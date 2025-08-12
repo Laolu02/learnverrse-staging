@@ -98,7 +98,7 @@ export const getUploadUrl = AsyncHandler(async (req, res) => {
   if (!fileName || !fileType) {
     throw new BadRequestException('File name and type are required');
   }
-  const { uploadUrl, videoUrl, metadata } = await getUploadUrlService(
+  const { uploadUrl, fileUrl, metadata } = await getUploadUrlService(
     fileName,
     fileType,
     fileSize
@@ -106,6 +106,6 @@ export const getUploadUrl = AsyncHandler(async (req, res) => {
 
   return res.status(HTTPSTATUS.CREATED).json({
     success: true,
-    data: { uploadUrl, videoUrl, metadata },
+    data: { uploadUrl, fileUrl, metadata },
   });
 });

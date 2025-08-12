@@ -7,6 +7,7 @@ import {
 } from '../../utils/appError.js';
 import { initializeProgress } from '../course-progress/course.progress.service.js';
 import CourseModel from '../course/model/course.model.js';
+import CoursePayment from '../payment/payment.model.js';
 import { enrollInCourse } from './enrol.service.js';
 
 export const courseEnrollmentController = AsyncHandler(async (req, res) => {
@@ -23,17 +24,17 @@ export const courseEnrollmentController = AsyncHandler(async (req, res) => {
   }
 
   // If course is paid, check for user's payment
-  // if (course.subscription === CourseSubscriptionEnum.PAID) {
-  //   const payment = await PaymentModel.findOne({
-  //     userId,
-  //     courseId,
-  //     status: 'success',
-  //   });
+  if (course.subscription === CourseSubscriptionEnum.PAID) {
+    const payment = await CoursePayment.findOne({
+      student: userId,
+      course: courseId,
+      status: 'success',
+    });
 
-  //   if (!payment) {
-  //     throw new UnauthorizedException('No valid payment found for this course');
-  //   }
-  // }
+    if (!payment) {
+      throw new UnauthorizedException('No valid payment found for this course');
+    }
+  }
 
   //  Proceed with enrollment
   await enrollInCourse({ userId, courseId });

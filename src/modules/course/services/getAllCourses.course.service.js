@@ -40,6 +40,9 @@ export const getAllCoursesService = async (req) => {
       filters.isFeatured = isFeatured === 'true';
     }
 
+    //show only approved courses
+    filters.isApproved = true;
+
     const [courses, totalCourses] = await Promise.all([
       CourseModel.find(filters)
         .sort({ createdAt: -1 })

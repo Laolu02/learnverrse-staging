@@ -9,6 +9,7 @@ import { RateLimiterRedis } from 'rate-limiter-flexible';
 import routes from './routes/index.js';
 import errorHandler from './middlewares/errorHandler.middleware.js';
 import logger from './utils/logger.js';
+import { paystackCourseWebhookController } from './modules/payment/payment.controller.js';
 
 const app = express();
 
@@ -68,6 +69,17 @@ const corsOptions = {
 
 // This works and avoids path-to-regexp errors
 // app.use('/api', cors(corsOptions), routes);
+
+// Public webhook route for Paystack
+app.post(
+  '/api/paystack/webhook',
+  express.raw({ type: '*/*' }),
+  async (req, res, next) => {
+    logger.info(`Received ${req.method} request to ${req.url}`);
+    next();
+  },
+  paystackCourseWebhookController
+);
 
 // Body & cookies
 app.use(express.json());

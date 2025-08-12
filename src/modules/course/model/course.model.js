@@ -14,7 +14,7 @@ const chapterSchema = new Schema({
   },
   title: { type: String },
   content: { type: String },
-  video: { type: String }, 
+  video: { type: String },
   duration: { type: Number }, // duration in minutes for videos
 });
 
@@ -79,7 +79,7 @@ const courseSchema = new mongoose.Schema(
     },
     isApproved: {
       type: Boolean,
-      default: false,
+      default: true,
       required: true,
     },
     isFeatured: {
