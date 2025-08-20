@@ -12,6 +12,8 @@ import {
 } from '../../utils/appError.js';
 
 import Paystack from 'paystack';
+import { enrollInCourse } from '../enrolment/enrol.service.js';
+import { initializeProgress } from '../course-progress/course.progress.service.js';
 
 // Initialize Paystack with the secret key
 const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY || '';
@@ -130,27 +132,69 @@ export const createCoursePaymentRecord = async (
 export const updatePaymentStatus = async (
   reference,
   status,
-  transactionId,
+  transactionId = null,
   session = null
 ) => {
   try {
-    const payment = await CoursePayment.findOne({
+    // Use upsert with specific conditions to handle race conditions
+    const filter = {
       transactionReference: reference,
-    }).session(session);
+      // Only update if status is not already at target or higher
+      $or: [
+        { status: { $ne: status } },
+        { transactionId: { $exists: false } },
+        { transactionId: null },
+      ],
+    };
+
+    const updateData = {
+      $set: {
+        status,
+        updatedAt: new Date(),
+        ...(transactionId && { transactionId }),
+      },
+    };
+
+    let query = CoursePayment.findOneAndUpdate(filter, updateData, {
+      new: true,
+      runValidators: true,
+      upsert: false, // Don't create if doesn't exist
+    });
+
+    if (session) {
+      query = query.session(session);
+    }
+
+    const payment = await query;
 
     if (!payment) {
-      throw new BadRequestException('Payment record not found');
+      // Check if payment exists but wasn't updated due to filter conditions
+      const existingPayment = await CoursePayment.findOne({
+        transactionReference: reference,
+      }).session(session);
+
+      if (!existingPayment) {
+        throw new BadRequestException('Payment record not found');
+      }
+
+      // Payment exists but already in desired state
+      return payment;
     }
 
-    if (transactionId) {
-      payment.transactionId = transactionId;
-    }
-
-    await payment.updateStatus(status, session);
+    logger.info(`Payment ${reference} status updated to ${status}`);
 
     return payment;
   } catch (error) {
-    logger.error(`Error updating payment status: ${error}`);
+    logger.error(
+      `Error updating payment status for ${reference}: ${error.message}`,
+      {
+        reference,
+        status,
+        transactionId,
+        error: error.stack,
+      }
+    );
+
     if (error instanceof BadRequestException) throw error;
     throw new InternalServerException('Failed to update payment status');
   }
@@ -332,6 +376,14 @@ export const handlePaystackWebhookEvent = async (event) => {
         'success',
         data.id.toString()
       );
+
+      // In your webhook handler
+      await enrollInCourse({
+        userId: payment.student,
+        courseId: payment.course,
+      });
+
+      await initializeProgress(payment.student, payment.course);
 
       logger.info(`Course payment successful for reference: ${reference}`);
       return { success: true, message: 'Course payment successful' };

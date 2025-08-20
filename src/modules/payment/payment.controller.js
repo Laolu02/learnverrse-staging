@@ -23,6 +23,8 @@ import {
   getCourseAnalytics,
 } from './payment.service.js';
 import { InitializeCoursePaymentSchema } from './payment.validation.js';
+import { enrollInCourse } from '../enrolment/enrol.service.js';
+import { initializeProgress } from '../course-progress/course.progress.service.js';
 
 // Schema for payment initialization validation
 
@@ -107,6 +109,9 @@ export const initializeCoursePaymentController = AsyncHandler(
 // Verify course payment
 export const verifyCoursePaymentController = AsyncHandler(
   async (req, res, next) => {
+    // Start a database session for transaction
+    const session = await mongoose.startSession();
+
     try {
       const { reference } = req.params;
 
@@ -114,25 +119,42 @@ export const verifyCoursePaymentController = AsyncHandler(
         throw new BadRequestException('Payment reference is required');
       }
 
-      // Verify payment with Paystack
+      // Verify payment with Paystack first
       const verificationResult = await verifyPaystackPayment(reference);
 
       if (verificationResult.status === 'success') {
-        // Update payment status to success
-        const payment = await updatePaymentStatus(
-          reference,
-          'success',
-          verificationResult.id.toString()
-        );
+        // Start transaction
+        await session.withTransaction(async () => {
+          // Step 1: Update payment status to success
+          const payment = await updatePaymentStatus(
+            reference,
+            'success',
+            verificationResult.id.toString(),
+            session
+          );
 
-        // Create enrollment for the student
-        // const { createEnrollmentFromPayment } = await import(
-        //   '../services/enrollment.service.js'
-        // );
-        // const enrollment = await createEnrollmentFromPayment(
-        //   payment._id,
-        //   session
-        // );
+          if (!payment) {
+            throw new BadRequestException('Payment record not found');
+          }
+
+          // Step 2: Enroll in course (idempotent - won't fail if already enrolled)
+          const enrollmentResult = await enrollInCourse({
+            userId: payment.student,
+            courseId: payment.course,
+            session,
+          });
+
+          // Step 3: Initialize progress (idempotent - won't fail if already initialized)
+          const progressResult = await initializeProgress(
+            payment.student,
+            payment.course,
+            session
+          );
+
+          // Log what actions were taken (useful for debugging)
+          console.log('Enrollment result:', enrollmentResult.message);
+          console.log('Progress result:', progressResult.message);
+        });
 
         const { id, status, paid_at, amount } = verificationResult;
 
@@ -148,7 +170,7 @@ export const verifyCoursePaymentController = AsyncHandler(
           },
         });
       } else {
-        // Update payment status to failed
+        // Update payment status to failed (outside transaction since it's just one operation)
         await updatePaymentStatus(reference, 'failed', null);
 
         return res.status(HTTPSTATUS.BAD_REQUEST).json({
@@ -161,7 +183,12 @@ export const verifyCoursePaymentController = AsyncHandler(
         });
       }
     } catch (error) {
+      // Log the error for debugging
+      console.error('Payment verification error:', error);
       return next(error);
+    } finally {
+      // Always end the session
+      await session.endSession();
     }
   }
 );

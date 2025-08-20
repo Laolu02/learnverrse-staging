@@ -6,18 +6,32 @@ import CourseModel from '../course/model/course.model.js';
 import EnrollmentModel from '../enrolment/model/enrolment.model.js';
 import CourseProgressModel from './course.progress.model.js';
 
-export const initializeProgress = async (userId, courseId) => {
-  const existingProgress = await CourseProgressModel.findOne({
-    userId,
-    courseId,
-  });
+export const initializeProgress = async (userId, courseId, session) => {
+  // Check if progress already exists (with session if provided)
+  const query = CourseProgressModel.findOne({ userId, courseId });
+  const existingProgress = await (session ? query.session(session) : query);
+
   if (existingProgress) {
-    throw new Error('Progress already initialized for this course');
+    // Progress already exists - return existing progress (idempotent)
+    return {
+      progress: existingProgress,
+      created: false,
+      message: 'Progress already initialized',
+    };
   }
 
-  const course = await CourseModel.findById(courseId);
+  const courseQuery = CourseModel.findById(courseId);
+  const course = await (session ? courseQuery.session(session) : courseQuery);
+
   if (!course) {
     throw new NotFoundException('Course not found');
+  }
+
+  // Ensure course has sections before proceeding
+  if (!course.sections || course.sections.length === 0) {
+    throw new BadRequestException(
+      'Course has no sections to initialize progress'
+    );
   }
 
   const progressSections = course.sections.map((section) => ({
@@ -49,6 +63,16 @@ export const initializeProgress = async (userId, courseId) => {
     },
   });
 
-  await courseProgress.save();
-  return courseProgress;
+  // Save with session if provided
+  if (session) {
+    await courseProgress.save({ session });
+  } else {
+    await courseProgress.save();
+  }
+
+  return {
+    progress: courseProgress,
+    created: true,
+    message: 'Progress initialized successfully',
+  };
 };
