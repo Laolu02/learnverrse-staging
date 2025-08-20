@@ -1,4 +1,10 @@
-import { BadRequestException } from '../../utils/appError.js';
+import mongoose from 'mongoose';
+
+import {
+  BadRequestException,
+  NotFoundException,
+} from '../../utils/appError.js';
+import CourseModel from '../course/model/course.model.js';
 import EnrollmentModel from './model/enrolment.model.js';
 
 // Idempotent enrollment function - safe to call multiple times
