@@ -67,28 +67,27 @@ const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 };
 
-// This works and avoids path-to-regexp errors
-// app.use('/api', cors(corsOptions), routes);
-
-// Public webhook route for Paystack
+//  Webhook route MUST come before express.json() middleware
 app.post(
   '/api/paystack/webhook',
-  express.raw({ type: '*/*' }),
+  express.raw({ type: 'application/json' }), // Specify the content type
   async (req, res, next) => {
     logger.info(`Received ${req.method} request to ${req.url}`);
+    logger.info(`Content-Type: ${req.headers['content-type']}`);
+    logger.info(`Signature: ${req.headers['x-paystack-signature']}`);
     next();
   },
   paystackCourseWebhookController
 );
 
-// Body & cookies
+// Body parsers - AFTER webhook routes
 app.use(express.json());
 app.use(cookieParser());
 
 // Apply CORS
 app.use(cors(corsOptions));
 
-// Logging
+// Logging middleware
 app.use((req, res, next) => {
   logger.info(`Received ${req.method} request to ${req.url}`);
   next();
@@ -120,7 +119,7 @@ app.use((req, res) => {
   res.status(404).json({
     success: false,
     message:
-      "Lost? 🚀 That page doesn't exist — but welcome to Learnverrse! Let's explore knowledge together.",
+      "This page doesn't exist — but welcome to Learnverrse! Let's explore knowledge together.",
   });
 });
 

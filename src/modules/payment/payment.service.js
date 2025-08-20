@@ -349,14 +349,20 @@ export const verifyPaystackWebhookSignature = (signature, payload) => {
       return false;
     }
 
+    // Ensure payload is a string or buffer for HMAC
+    const payloadString = Buffer.isBuffer(payload)
+      ? payload.toString()
+      : payload;
+
     const computedHash = crypto
       .createHmac('sha512', secretKey)
-      .update(payload)
+      .update(payloadString)
       .digest('hex');
 
+    // Compare the hashes
     return signature === computedHash;
   } catch (error) {
-    logger.error(`Error verifying webhook signature: ${error}`);
+    logger.error(`Error verifying webhook signature: ${error.message}`);
     return false;
   }
 };

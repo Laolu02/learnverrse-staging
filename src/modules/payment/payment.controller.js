@@ -207,7 +207,9 @@ export const paystackCourseWebhookController = AsyncHandler(
         });
       }
 
-      const payload = JSON.stringify(req.body);
+      // Get the raw body
+      const payload = req.body;
+
       const isValidSignature = verifyPaystackWebhookSignature(
         signature,
         payload
@@ -221,8 +223,11 @@ export const paystackCourseWebhookController = AsyncHandler(
         });
       }
 
+      // Parse the JSON body for processing
+      const eventData = JSON.parse(payload.toString());
+
       // Process the webhook event
-      await handlePaystackWebhookEvent(req.body);
+      await handlePaystackWebhookEvent(eventData);
 
       // Always respond with 200 to acknowledge receipt
       return res.status(HTTPSTATUS.OK).json({
@@ -231,6 +236,7 @@ export const paystackCourseWebhookController = AsyncHandler(
       });
     } catch (error) {
       logger.error(`Webhook processing error: ${error.message}`);
+      // Return 200 even on error to prevent Paystack retries for processing errors
       return res.status(HTTPSTATUS.OK).json({
         success: true,
         message: 'Webhook received',
