@@ -2,14 +2,17 @@ import express from 'express';
 import {
   createCourse,
   deleteCourse,
+  getEducatorCourseById,
   updateCourse,
-  viewAllCourses,
+  viewAllEducatorCourses,
 } from '../controllers/course.educator.controller.js';
 
 import { getUploadFileUrl } from '../controllers/upload.controller.js';
 const router = express.Router();
 
-router.get('/', viewAllCourses);
+router.get('/', viewAllEducatorCourses);
+
+router.get('/:courseId', getEducatorCourseById);
 
 router.post('/', createCourse);
 

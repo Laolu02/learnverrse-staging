@@ -9,7 +9,7 @@ export const createCourseService = async (req) => {
       educatorId: req?.user._id,
       educatorName: req?.user.name || 'Unknown Educator',
       title: 'Untitled Course',
-      description: 'about course',
+      description: 'Course description will be added here',
       category: 'Uncategorized',
       price: 0,
       image: '',
@@ -19,11 +19,21 @@ export const createCourseService = async (req) => {
       isApproved: false,
       isFeatured: false,
       sections: [],
-      quiz: [],
+      // Initialize rating fields with default values
+      totalDuration: 0,
+      averageRating: 0,
+      totalRatings: 0,
+      totalReviews: 0,
+      ratingBreakdown: {
+        fiveStar: 0,
+        fourStar: 0,
+        threeStar: 0,
+        twoStar: 0,
+        oneStar: 0,
+      },
     });
 
     await newCourse.save();
-
     return newCourse;
   } catch (error) {
     throw error;

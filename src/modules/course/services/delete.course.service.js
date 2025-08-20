@@ -18,8 +18,7 @@ export const deleteCourseService = async (courseId, educatorId) => {
       );
     }
 
-    await course.deleteOne();
-
+    await CourseModel.findByIdAndDelete(courseId);
     return { message: 'Course deleted successfully' };
   } catch (error) {
     throw error;
