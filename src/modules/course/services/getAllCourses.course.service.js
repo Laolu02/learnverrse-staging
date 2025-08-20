@@ -47,7 +47,7 @@ export const getAllCoursesService = async (req) => {
       CourseModel.find(filters)
         .sort({ createdAt: -1 })
         .select(
-          'title description category price level status createdAt educatorName'
+          'title description category price level status isApproved isFeatured totalDuration  subscription createdAt educatorName averageRating totalRatings totalReviews'
         )
         .skip(skip)
         .limit(limitNum)
