@@ -4,22 +4,22 @@ import { v4 as uuidv4 } from 'uuid';
 import { config } from '../../../configs/app.config.js';
 import logger from '../../../utils/logger.js';
 
-// AWS S3 Configuration with optimizations
+// S3 Client with checksum disabled
 const s3 = new S3Client({
   region: config.AWS_REGION,
   credentials: {
     accessKeyId: config.AWS_ACCESS_KEY_ID,
     secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
   },
-  maxAttempts: 3,
-  retryMode: 'adaptive',
+  // Disable automatic checksums
+  requestChecksumCalculation: false,
+  responseChecksumValidation: false,
 });
 
-// Efficient file type configuration with size limits
+// File type configuration
 const FILE_CONFIG = {
   image: {
     folder: 'images',
-    maxSize: 50 * 1024 * 1024, // 50MB
     types: new Set([
       'image/jpeg',
       'image/jpg',
@@ -28,18 +28,26 @@ const FILE_CONFIG = {
       'image/webp',
       'image/bmp',
       'image/tiff',
+      'image/svg+xml',
     ]),
-    expiry: 300, // 5 mins
+    expiry: 300,
+    maxSizeMB: 50,
   },
   document: {
     folder: 'documents',
-    maxSize: 100 * 1024 * 1024, // 100MB
-    types: new Set(['application/pdf']),
-    expiry: 600, // 10 mins
+    types: new Set([
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+    ]),
+    expiry: 600,
+    maxSizeMB: 100,
   },
   video: {
     folder: 'videos',
-    maxSize: 300 * 1024 * 1024, // 300MB
     types: new Set([
       'video/mp4',
       'video/avi',
@@ -49,144 +57,161 @@ const FILE_CONFIG = {
       'video/mkv',
       'video/quicktime',
     ]),
-    expiry: 900, // 15 mins for large uploads
+    expiry: 900,
+    maxSizeMB: 500,
+  },
+  audio: {
+    folder: 'audio',
+    types: new Set([
+      'audio/mpeg',
+      'audio/wav',
+      'audio/ogg',
+      'audio/mp3',
+      'audio/mp4',
+    ]),
+    expiry: 600,
+    maxSizeMB: 100,
   },
 };
 
-// Fast file type detection and validation
-const getFileConfig = (fileType, fileSize) => {
-  // Find matching config
+const getFileConfig = (fileType) => {
+  const normalizedType = fileType.toLowerCase().trim();
+
   for (const [category, config] of Object.entries(FILE_CONFIG)) {
-    if (config.types.has(fileType)) {
-      // Validate size
-      if (fileSize > config.maxSize) {
-        const maxMB = Math.round(config.maxSize / (1024 * 1024));
-        throw new Error(
-          `${category} files cannot exceed ${maxMB}MB. Current size: ${Math.round(
-            fileSize / (1024 * 1024)
-          )}MB`
-        );
-      }
-      return config;
+    if (config.types.has(normalizedType)) {
+      return { ...config, category };
     }
   }
 
-  // Unsupported type
   const supportedTypes = Object.values(FILE_CONFIG)
     .flatMap((config) => Array.from(config.types))
+    .sort()
     .join(', ');
+
   throw new Error(
     `Unsupported file type: ${fileType}. Supported: ${supportedTypes}`
   );
 };
 
-// Input validation with detailed error messages
-const validateInput = (fileName, fileType, fileSize) => {
-  if (!fileName?.trim()) {
-    throw new Error('fileName is required and cannot be empty');
+const validateInput = (fileName, fileType) => {
+  if (!fileName || typeof fileName !== 'string' || !fileName.trim()) {
+    throw new Error('fileName is required and must be a non-empty string');
   }
 
-  if (!fileType?.trim()) {
-    throw new Error('fileType is required and cannot be empty');
+  if (!fileType || typeof fileType !== 'string' || !fileType.trim()) {
+    throw new Error('fileType is required and must be a non-empty string');
   }
 
-  if (!fileSize || typeof fileSize !== 'number' || fileSize <= 0) {
-    throw new Error('fileSize must be a positive number in bytes');
+  if (!fileType.includes('/')) {
+    throw new Error('fileType must be a valid MIME type (e.g., image/jpeg)');
   }
 
-  // Sanitize filename
-  const sanitizedName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-  if (sanitizedName !== fileName) {
-    logger.warn(`Filename sanitized: ${fileName} -> ${sanitizedName}`);
+  const sanitizedName = fileName
+    .trim()
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+    .replace(/\.+$/, '')
+    .replace(/\s+/g, '_')
+    .substring(0, 255);
+
+  if (!sanitizedName) {
+    throw new Error('fileName contains only invalid characters');
   }
 
   return sanitizedName;
 };
 
-// Generate optimized S3 key with date partitioning for better performance
 const generateS3Key = (folder, fileName) => {
   const date = new Date();
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
   const uniqueId = uuidv4();
 
-  // Date partitioning: folder/year/month/uuid/filename
-  return `${folder}/${year}/${month}/${uniqueId}/${fileName}`;
+  return `${folder}/${year}/${month}/${day}/${uniqueId}/${fileName}`;
 };
 
-export const getUploadUrlService = async (fileName, fileType, fileSize) => {
+export const getUploadUrlService = async (fileName, fileType) => {
   const startTime = Date.now();
+  let s3Key = '';
 
   try {
-    // Input validation
-    const sanitizedFileName = validateInput(fileName, fileType, fileSize);
+    const sanitizedFileName = validateInput(fileName, fileType);
+    const fileConfig = getFileConfig(fileType);
+    s3Key = generateS3Key(fileConfig.folder, sanitizedFileName);
 
-    // Get file configuration and validate
-    const fileConfig = getFileConfig(fileType, fileSize);
-
-    // Generate optimized S3 key
-    const s3Key = generateS3Key(fileConfig.folder, sanitizedFileName);
-
-    // Prepare S3 command with metadata
+    // Create command with explicit checksum disabling
     const command = new PutObjectCommand({
       Bucket: config.S3_BUCKET_NAME,
       Key: s3Key,
       ContentType: fileType,
-      ContentLength: fileSize,
-      Metadata: {
-        'original-name': fileName,
-        'upload-timestamp': Date.now().toString(),
-        'file-category': fileConfig.folder,
-      },
-      // Performance optimizations
-      StorageClass: 'STANDARD',
-      ServerSideEncryption: 'AES256',
+      // Explicitly disable checksums
+      ChecksumAlgorithm: undefined,
     });
 
-    // Generate presigned URL with appropriate expiry
+    // Remove any middleware that might add checksums
+    command.middlewareStack.remove('checksumMiddleware');
+
+    // Generate presigned URL with additional options to prevent extra params
     const uploadUrl = await getSignedUrl(s3, command, {
       expiresIn: fileConfig.expiry,
+      // Disable signing of extra headers
+      unhoistableHeaders: new Set(),
+      signableHeaders: new Set(['host']),
     });
 
-    // Construct CloudFront URL
-    const fileUrl = `https://${config.CLOUDFRONT_DOMAIN}/${s3Key}`;
+    const fileUrl = config.CLOUDFRONT_DOMAIN
+      ? `https://${config.CLOUDFRONT_DOMAIN}/${s3Key}`
+      : `https://${config.S3_BUCKET_NAME}.s3.${config.AWS_REGION}.amazonaws.com/${s3Key}`;
 
-    // Performance logging
     const duration = Date.now() - startTime;
-    logger.info('Upload URL generated', {
+
+    logger.info('Upload URL generated successfully', {
       fileName: sanitizedFileName,
       fileType,
-      fileSize,
-      category: fileConfig.folder,
-      duration: `${duration}ms`,
+      category: fileConfig.category,
       s3Key,
+      duration: `${duration}ms`,
     });
 
     return {
+      success: true,
       uploadUrl,
       fileUrl,
       metadata: {
-        category: fileConfig.folder,
-        expiresIn: fileConfig.expiry,
-        maxSize: fileConfig.maxSize,
         s3Key,
+        category: fileConfig.category,
+        expiresIn: fileConfig.expiry,
+        expiresAt: new Date(
+          Date.now() + fileConfig.expiry * 1000
+        ).toISOString(),
+        maxSizeMB: fileConfig.maxSizeMB,
+        sanitizedFileName,
+        originalFileName: fileName,
+        uploadInstructions: {
+          method: 'PUT',
+          headers: {
+            'Content-Type': fileType,
+          },
+          note: 'Send file as binary body. Do not add any additional headers.',
+        },
       },
     };
   } catch (error) {
     const duration = Date.now() - startTime;
 
-    // Enhanced error logging
-    logger.error('Failed to generate upload URL', {
+    logger.error('Upload URL generation failed', {
       fileName,
       fileType,
-      fileSize,
+      s3Key,
       duration: `${duration}ms`,
       error: error.message,
-      stack: error.stack,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
 
-    // Throw with context
-    error.context = { fileName, fileType, fileSize };
-    throw error;
+    const enhancedError = new Error(error.message);
+    enhancedError.statusCode = 400;
+    enhancedError.context = { fileName, fileType };
+
+    throw enhancedError;
   }
 };
