@@ -133,6 +133,50 @@ courseSchema.methods.calculateTotalDuration = function () {
   return totalDuration;
 };
 
+// Pre-save middleware to automatically calculate total duration
+courseSchema.pre('save', function (next) {
+  // Only recalculate if sections have been modified or it's a new document
+  if (this.isNew || this.isModified('sections')) {
+    this.calculateTotalDuration();
+  }
+  next();
+});
+
+// Pre-update middleware for findOneAndUpdate operations
+courseSchema.pre(['updateOne', 'findOneAndUpdate'], function (next) {
+  const update = this.getUpdate();
+
+  // Check if sections are being updated
+  if (update.$set && update.$set.sections) {
+    // Calculate duration from the updated sections
+    let totalDuration = 0;
+    update.$set.sections.forEach((section) => {
+      section.chapters.forEach((chapter) => {
+        if (chapter.duration) {
+          totalDuration += chapter.duration;
+        }
+      });
+    });
+
+    // Set the total duration in the update
+    update.$set.totalDuration = totalDuration;
+  }
+
+  next();
+});
+
+// Alternative approach: Use post middleware to recalculate after update operations
+courseSchema.post(['updateOne', 'findOneAndUpdate'], async function (doc) {
+  if (doc && this.getUpdate().$set && this.getUpdate().$set.sections) {
+    // Find and update the document with recalculated duration
+    const updatedDoc = await this.model.findById(doc._id);
+    if (updatedDoc) {
+      updatedDoc.calculateTotalDuration();
+      await updatedDoc.save();
+    }
+  }
+});
+
 // Method to update rating statistics
 courseSchema.methods.updateRatingStats = async function () {
   const ReviewModel = mongoose.model('Review');
